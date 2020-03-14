@@ -89,9 +89,9 @@ def run(args: DictConfig) -> None:
             optimal_loss = 1e5
             for epoch in range(1, args.n_epochs + 1):
                 if epoch in args.schedule:
-                    args.learning_rate *= args.gamma
+                    args.lr *= args.gamma
                     for param_group in optimizer.param_groups:
-                        param_group['lr'] = args.learning_rate
+                        param_group['lr'] = args.lr
 
                 loss, acc = train_epoch(classifier, train_loader, args, optimizer)
                 if loss < optimal_loss:
