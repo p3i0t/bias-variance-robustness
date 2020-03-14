@@ -10,11 +10,11 @@ hydra:
     dir: logs/${dataset}
 
 dataset: cifar10
-
 data_dir: data
-
 classifier_name: resnet18 # or resnet34, resnet50
 width: 16
+n_split: 3  # for bias-variance estimation design
+
 
 n_classes: 10
 
