@@ -85,7 +85,7 @@ def run(args: DictConfig) -> None:
             classifier.load_state_dict(torch.load(checkpint))
             logger.info('Load classifier from checkpoint')
         else:
-            optimizer = SGD(classifier.parameters(), lr=args.lr_max, momentum=args.momentum, weight_decay=args.weight_decay)
+            optimizer = SGD(classifier.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
             optimal_loss = 1e5
             for epoch in range(1, args.n_epochs + 1):
                 loss, acc = train_epoch(classifier, train_loader, args, optimizer)
