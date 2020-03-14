@@ -7,7 +7,6 @@ from torch.optim import SGD, lr_scheduler
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split
 from utils import cal_parameters, get_dataset, AverageMeter
-import utils
 
 from models import resnet18
 from attack import eval_epoch
@@ -34,29 +33,14 @@ def train_epoch(classifier, data_loader, args, optimizer, scheduler=None):
     """
     classifier.train()
 
-    # ajust according to std.
-    eps = eval(args.epsilon) / utils.std
-    eps_iter = eval(args.epsilon_iter) / utils.std
-
     loss_meter = AverageMeter('loss')
     acc_meter = AverageMeter('Acc')
 
     for batch_idx, (x, y) in enumerate(data_loader):
         x, y = x.to(args.device), y.to(args.device)
-        # start with uniform noise
-        delta = torch.zeros_like(x).uniform_(-eps, eps)
-        delta.requires_grad_()
-        delta = clamp(delta, utils.clip_min - x, utils.clip_max - x)
-
-        loss = F.cross_entropy(classifier(x + delta), y)
-        grad_delta = torch.autograd.grad(loss, delta)[0].detach()  # get grad of noise
-
-        # update delta with grad
-        delta = (delta + torch.sign(grad_delta) * eps_iter).clamp_(-eps, eps)
-        delta = clamp(delta, utils.clip_min - x, utils.clip_max - x)
 
         # real forward
-        logits = classifier(x + delta)
+        logits = classifier(x)
         loss = F.cross_entropy(logits, y)
 
         optimizer.zero_grad()
@@ -73,12 +57,10 @@ def train_epoch(classifier, data_loader, args, optimizer, scheduler=None):
     return loss_meter.avg, acc_meter.avg
 
 
-@hydra.main(config_path='configs/fast_fgsm_config.yaml')
+@hydra.main(config_path='configs/base_config.yaml')
 def run(args: DictConfig) -> None:
-    # cuda_available = torch.cuda.is_available()
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
-    # device = "cuda" if cuda_available and args.device == 'cuda' else "cpu"
 
     classifier = eval(args.classifier_name)(args.width, args.n_classes).to(args.device)
     logger.info('Classifier: {}, width: {}, # parameters: {}'
@@ -95,7 +77,7 @@ def run(args: DictConfig) -> None:
     datasets_list = random_split(train_data, lengths=lengths)
 
     for split_id, dataset in enumerate(datasets_list):
-        checkpint = '{}_w{}_split{}_at_fast.pth'.format(args.classifier_name, args.width, split_id)
+        checkpint = '{}_w{}_split{}.pth'.format(args.classifier_name, args.width, split_id)
         logger.info('Running on subset {}'.format(split_id + 1))
         train_loader = DataLoader(dataset=dataset, batch_size=args.n_batch_train, shuffle=True)
 
@@ -104,17 +86,13 @@ def run(args: DictConfig) -> None:
             logger.info('Load classifier from checkpoint')
         else:
             optimizer = SGD(classifier.parameters(), lr=args.lr_max, momentum=args.momentum, weight_decay=args.weight_decay)
-            lr_steps = args.n_epochs * len(train_loader)
-            scheduler = lr_scheduler.CyclicLR(optimizer, base_lr=args.lr_min, max_lr=args.lr_max,
-                                              step_size_up=lr_steps/2, step_size_down=lr_steps/2)
-
             optimal_loss = 1e5
             for epoch in range(1, args.n_epochs + 1):
-                loss, acc = train_epoch(classifier, train_loader, args, optimizer, scheduler=scheduler)
+                loss, acc = train_epoch(classifier, train_loader, args, optimizer)
                 if loss < optimal_loss:
                     optimal_loss = loss
                     torch.save(classifier.state_dict(), checkpint)
-                logger.info('Epoch {}, lr: {:.4f}, loss: {:.4f}, acc: {:.4f}'.format(epoch, scheduler.get_lr()[0], loss, acc))
+                logger.info('Epoch {}, loss: {:.4f}, acc: {:.4f}'.format(epoch,loss, acc))
 
         clean_loss, clean_acc = eval_epoch(classifier, test_loader, args, adversarial=False)
         adv_loss, adv_acc = eval_epoch(classifier, test_loader, args, adversarial=True)

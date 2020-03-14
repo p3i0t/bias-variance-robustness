@@ -9,7 +9,6 @@ hydra:
     #dir: logs/${dataset}
     dir: logs/${dataset}
 
-model_type: base
 dataset: cifar10
 
 data_dir: data
@@ -22,7 +21,7 @@ n_classes: 10
 inference: False  # False for training, True for inference.
 
 # training parameters
-epochs: 300
+epochs: 100
 n_batch_train: 128
 n_batch_test: 200
 
@@ -30,7 +29,7 @@ optimizer: sgd
 learning_rate: 0.1
 momentum: 0.9
 decay: 0.0005
-schedule: [150, 225]  # Decrease learning rate at these epochs.
+schedule: [50, 75]  # Decrease learning rate at these epochs.
 gamma: 0.1  # LR is multiplied by gamma on schedule.
 
 seed: 1234
