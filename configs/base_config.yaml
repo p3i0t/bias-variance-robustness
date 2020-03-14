@@ -25,6 +25,10 @@ n_epochs: 80
 n_batch_train: 128
 n_batch_test: 200
 
+epsilon: 4/255
+epsilon_iter: 5/255
+pgd_epsilon_iter: 2/255  # for PGD evaluation
+
 optimizer: sgd
 lr: 0.1
 momentum: 0.9
