@@ -34,4 +34,4 @@ gamma: 0.1  # LR is multiplied by gamma on schedule.
 
 seed: 1234
 n_gpu: 1
-device: cpu
+device: cuda

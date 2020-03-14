@@ -78,7 +78,7 @@ def run(args: DictConfig) -> None:
 
     for split_id, dataset in enumerate(datasets_list):
         checkpint = '{}_w{}_split{}.pth'.format(args.classifier_name, args.width, split_id)
-        logger.info('Running on subset {}'.format(split_id + 1))
+        logger.info('Running on subset {}, size: {}'.format(split_id + 1, len(dataset)))
         train_loader = DataLoader(dataset=dataset, batch_size=args.n_batch_train, shuffle=True)
 
         if args.inference is True:
