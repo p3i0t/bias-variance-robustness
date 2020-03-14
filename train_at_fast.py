@@ -34,7 +34,7 @@ def train_epoch(classifier, data_loader, args, optimizer, scheduler=None):
     classifier.train()
 
     # ajust according to std.
-    eps = eval(args.epsilon) / utils.cifar10_std
+    eps = eval(args.epsilon) / utils.std
     eps_iter = eval(args.epsilon_iter) / utils.std
 
     loss_meter = AverageMeter('loss')
@@ -152,7 +152,6 @@ def run(args: DictConfig) -> None:
     torch.cuda.manual_seed_all(args.seed)
     # device = "cuda" if cuda_available and args.device == 'cuda' else "cpu"
 
-    args.device = 'cpu'
     classifier = eval(args.classifier_name)(args.width, args.n_classes).to(args.device)
     logger.info('Classifier: {}, width: {}, # parameters: {}'
                 .format(args.classifier_name, args.width, cal_parameters(classifier)))
