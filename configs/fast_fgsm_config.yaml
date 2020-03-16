@@ -9,6 +9,7 @@ hydra:
     #dir: logs/${dataset}
     dir: logs/${dataset}
 
+model_type: at_fast
 
 dataset: cifar10
 data_dir: data
@@ -34,4 +35,4 @@ early_stop: True
 seed: 1234
 device: cuda
 
-inference: False
+adv_generation: False

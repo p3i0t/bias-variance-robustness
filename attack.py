@@ -1,3 +1,8 @@
+import hydra
+from omegaconf import DictConfig
+
+import os
+
 import torch
 import utils
 import torch.nn.functional as F
@@ -53,7 +58,7 @@ def attack_pgd(model, x, y, eps, eps_iter, attack_iters, restarts):
     return max_delta
 
 
-def eval_epoch(model, data_loader, args, adversarial=False):
+def eval_epoch(model, data_loader, args, adversarial=False, save=False):
     """Self-implemented PGD evaluation"""
     eps = eval(args.epsilon) / utils.std
     eps_iter = eval(args.pgd_epsilon_iter) / utils.std
@@ -63,6 +68,7 @@ def eval_epoch(model, data_loader, args, adversarial=False):
     loss_meter = AverageMeter('loss')
     acc_meter = AverageMeter('Acc')
     model.eval()
+    adv_list = []
     for i, (x, y) in enumerate(data_loader):
         x, y = x.to(args.device), y.to(args.device)
         if adversarial is True:
@@ -71,12 +77,19 @@ def eval_epoch(model, data_loader, args, adversarial=False):
             delta = 0.
 
         with torch.no_grad():
-            logits = model(x + delta)
+            adv_x = x + delta
+            logits = model(adv_x)
+            if save is True:
+                adv_list.append(adv_x)
             loss = F.cross_entropy(logits, y)
 
             loss_meter.update(loss.item(), x.size(0))
             acc = (logits.argmax(dim=1) == y).float().mean().item()
             acc_meter.update(acc, x.size(0))
 
+    if save is True:
+        save_dir = hydra.utils.to_absolute_path(args.data_dir)
+        adv_set = torch.cat(adv_list, dim=0)
+        torch.save(adv_set, os.path.join(save_dir, 'advset_{}_{}.pt'.format(args.classifier_name, args.model_type)))
     return loss_meter.avg, acc_meter.avg
 

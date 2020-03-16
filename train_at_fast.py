@@ -89,37 +89,54 @@ def run(args: DictConfig) -> None:
     test_data = get_dataset(data_name=args.dataset, data_dir=data_dir, train=False, crop_flip=False)
 
     test_loader = DataLoader(dataset=test_data, batch_size=args.n_batch_test, shuffle=False)
-    n = len(train_data)
-    split_size = n // args.n_split
-    lengths = [split_size] * (args.n_split - 1) + [n % split_size + split_size]
-    datasets_list = random_split(train_data, lengths=lengths)
 
-    for split_id, dataset in enumerate(datasets_list):
-        checkpint = '{}_w{}_split{}_at_fast.pth'.format(args.classifier_name, args.width, split_id)
-        logger.info('Running on subset {}, size: {}'.format(split_id + 1, len(dataset)))
-        train_loader = DataLoader(dataset=dataset, batch_size=args.n_batch_train, shuffle=True)
+    optimizer = SGD(classifier.parameters(), lr=args.lr_max,
+                    momentum=args.momentum, weight_decay=args.weight_decay)
 
-        if args.inference is True:
-            classifier.load_state_dict(torch.load(checkpint))
-            logger.info('Load classifier from checkpoint')
-        else:
-            optimizer = SGD(classifier.parameters(), lr=args.lr_max, momentum=args.momentum, weight_decay=args.weight_decay)
+    def run_forward(scheduler):
+        optimal_loss = 1e5
+        for epoch in range(1, args.n_epochs + 1):
+            loss, acc = train_epoch(classifier, train_loader, args, optimizer, scheduler=scheduler)
+            if loss < optimal_loss:
+                optimal_loss = loss
+                torch.save(classifier.state_dict(), checkpoint)
+            logger.info('Epoch {}, lr: {:.4f}, loss: {:.4f}, acc: {:.4f}'.format(epoch, scheduler.get_lr()[0], loss, acc))
+
+    if args.adv_generation:
+        checkpoint = '{}_w{}_at_fast.pth'.format(args.classifier_name, args.width)
+        train_loader = DataLoader(dataset=train_data, batch_size=args.n_batch_train, shuffle=True)
+        lr_steps = args.n_epochs * len(train_loader)
+        scheduler = lr_scheduler.CyclicLR(optimizer, base_lr=args.lr_min, max_lr=args.lr_max,
+                                          step_size_up=lr_steps/2, step_size_down=lr_steps/2)
+
+        run_forward(scheduler)
+
+        clean_loss, clean_acc = eval_epoch(classifier, test_loader, args, adversarial=False)
+        adv_loss, adv_acc = eval_epoch(classifier, test_loader, args, adversarial=True, save=True)
+        logger.info('Clean loss: {:.4f}, acc: {:.4f}'.format(clean_loss, clean_acc))
+        logger.info('Adversarial loss: {:.4f}, acc: {:.4f}'.format(adv_loss, adv_acc))
+
+    else:
+        n = len(train_data)
+        split_size = n // args.n_split
+        lengths = [split_size] * (args.n_split - 1) + [n % split_size + split_size]
+        datasets_list = random_split(train_data, lengths=lengths)
+
+        for split_id, dataset in enumerate(datasets_list):
+            checkpoint = '{}_w{}_split{}_at_fast.pth'.format(args.classifier_name, args.width, split_id)
+            logger.info('Running on subset {}, size: {}'.format(split_id + 1, len(dataset)))
+            train_loader = DataLoader(dataset=dataset, batch_size=args.n_batch_train, shuffle=True)
+
             lr_steps = args.n_epochs * len(train_loader)
             scheduler = lr_scheduler.CyclicLR(optimizer, base_lr=args.lr_min, max_lr=args.lr_max,
                                               step_size_up=lr_steps/2, step_size_down=lr_steps/2)
 
-            optimal_loss = 1e5
-            for epoch in range(1, args.n_epochs + 1):
-                loss, acc = train_epoch(classifier, train_loader, args, optimizer, scheduler=scheduler)
-                if loss < optimal_loss:
-                    optimal_loss = loss
-                    torch.save(classifier.state_dict(), checkpint)
-                logger.info('Epoch {}, lr: {:.4f}, loss: {:.4f}, acc: {:.4f}'.format(epoch, scheduler.get_lr()[0], loss, acc))
+            run_forward(scheduler)
 
-        clean_loss, clean_acc = eval_epoch(classifier, test_loader, args, adversarial=False)
-        adv_loss, adv_acc = eval_epoch(classifier, test_loader, args, adversarial=True)
-        logger.info('Clean loss: {:.4f}, acc: {:.4f}'.format(clean_loss, clean_acc))
-        logger.info('Adversarial loss: {:.4f}, acc: {:.4f}'.format(adv_loss, adv_acc))
+            clean_loss, clean_acc = eval_epoch(classifier, test_loader, args, adversarial=False)
+            adv_loss, adv_acc = eval_epoch(classifier, test_loader, args, adversarial=True)
+            logger.info('Clean loss: {:.4f}, acc: {:.4f}'.format(clean_loss, clean_acc))
+            logger.info('Adversarial loss: {:.4f}, acc: {:.4f}'.format(adv_loss, adv_acc))
 
 
 if __name__ == '__main__':

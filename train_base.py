@@ -71,38 +71,49 @@ def run(args: DictConfig) -> None:
     test_data = get_dataset(data_name=args.dataset, data_dir=data_dir, train=False, crop_flip=False)
 
     test_loader = DataLoader(dataset=test_data, batch_size=args.n_batch_test, shuffle=False)
-    n = len(train_data)
-    split_size = n // args.n_split
-    lengths = [split_size] * (args.n_split - 1) + [n % split_size + split_size]
-    datasets_list = random_split(train_data, lengths=lengths)
 
-    for split_id, dataset in enumerate(datasets_list):
-        checkpint = '{}_w{}_split{}.pth'.format(args.classifier_name, args.width, split_id)
-        logger.info('Running on subset {}, size: {}'.format(split_id + 1, len(dataset)))
-        train_loader = DataLoader(dataset=dataset, batch_size=args.n_batch_train, shuffle=True)
+    optimizer = SGD(classifier.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-        if args.inference is True:
-            classifier.load_state_dict(torch.load(checkpint))
-            logger.info('Load classifier from checkpoint')
-        else:
-            optimizer = SGD(classifier.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-            optimal_loss = 1e5
-            for epoch in range(1, args.n_epochs + 1):
-                if epoch in args.schedule:
-                    args.lr *= args.gamma
-                    for param_group in optimizer.param_groups:
-                        param_group['lr'] = args.lr
+    def run_forward():
+        optimal_loss = 1e5
+        for epoch in range(1, args.n_epochs + 1):
+            if epoch in args.schedule:
+                args.lr *= args.gamma
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = args.lr
 
-                loss, acc = train_epoch(classifier, train_loader, args, optimizer)
-                if loss < optimal_loss:
-                    optimal_loss = loss
-                    torch.save(classifier.state_dict(), checkpint)
-                logger.info('Epoch {}, loss: {:.4f}, acc: {:.4f}'.format(epoch,loss, acc))
+            loss, acc = train_epoch(classifier, train_loader, args, optimizer)
+            if loss < optimal_loss:
+                optimal_loss = loss
+                torch.save(classifier.state_dict(), checkpoint)
+            logger.info('Epoch {}, loss: {:.4f}, acc: {:.4f}'.format(epoch, loss, acc))
+
+    if args.adv_generation:
+        checkpoint = '{}_w{}.pth'.format(args.classifier_name, args.width)
+        train_loader = DataLoader(dataset=train_data, batch_size=args.n_batch_train, shuffle=True)
+        run_forward()
 
         clean_loss, clean_acc = eval_epoch(classifier, test_loader, args, adversarial=False)
-        adv_loss, adv_acc = eval_epoch(classifier, test_loader, args, adversarial=True)
+        adv_loss, adv_acc = eval_epoch(classifier, test_loader, args, adversarial=True, save=True)
         logger.info('Clean loss: {:.4f}, acc: {:.4f}'.format(clean_loss, clean_acc))
         logger.info('Adversarial loss: {:.4f}, acc: {:.4f}'.format(adv_loss, adv_acc))
+
+    else:
+        n = len(train_data)
+        split_size = n // args.n_split
+        lengths = [split_size] * (args.n_split - 1) + [n % split_size + split_size]
+        datasets_list = random_split(train_data, lengths=lengths)
+
+        for split_id, dataset in enumerate(datasets_list):
+            checkpoint = '{}_w{}_split{}.pth'.format(args.classifier_name, args.width, split_id)
+            logger.info('Running on subset {}, size: {}'.format(split_id + 1, len(dataset)))
+            train_loader = DataLoader(dataset=dataset, batch_size=args.n_batch_train, shuffle=True)
+
+            run_forward()
+            clean_loss, clean_acc = eval_epoch(classifier, test_loader, args, adversarial=False)
+            adv_loss, adv_acc = eval_epoch(classifier, test_loader, args, adversarial=True)
+            logger.info('Clean loss: {:.4f}, acc: {:.4f}'.format(clean_loss, clean_acc))
+            logger.info('Adversarial loss: {:.4f}, acc: {:.4f}'.format(adv_loss, adv_acc))
 
 
 if __name__ == '__main__':

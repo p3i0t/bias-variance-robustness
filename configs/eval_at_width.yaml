@@ -9,21 +9,17 @@ hydra:
     #dir: logs/${dataset}
     dir: logs/${dataset}
 
-model_type: clean
-
 dataset: cifar10
 data_dir: data
 classifier_name: resnet18 # or resnet34, resnet50
-width: 16
+width_list: [4, 8, 16, 32, 64]
 n_split: 3  # for bias-variance estimation design
-
 
 n_classes: 10
 
 inference: False  # False for training, True for inference.
 
 # training parameters
-n_epochs: 80
 n_batch_train: 128
 n_batch_test: 200
 
@@ -31,15 +27,6 @@ epsilon: 4/255
 epsilon_iter: 5/255
 pgd_epsilon_iter: 2/255  # for PGD evaluation
 
-optimizer: sgd
-lr: 0.1
-momentum: 0.9
-weight_decay: 0.0005
-schedule: [40, 60]  # Decrease learning rate at these epochs.
-gamma: 0.1  # LR is multiplied by gamma on schedule.
-
 seed: 1234
 n_gpu: 1
 device: cuda
-
-adv_generation: False
