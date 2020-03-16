@@ -51,7 +51,7 @@ def eval_risk_bias_variance(classifier_list, dataloader, args):
     return risk_meter.avg, bias_meter.avg, variance_meter.avg, acc_meter
 
 
-@hydra.main(config_path='configs/eval_config.yaml')
+@hydra.main(config_path='configs/eval_at_width_config.yaml')
 def run(args: DictConfig) -> None:
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
@@ -60,7 +60,7 @@ def run(args: DictConfig) -> None:
 
     clean_test_data = get_dataset(data_name=args.dataset, data_dir=data_dir, train=False, crop_flip=False)
     #advset_at = TensorDataset(torch.load(os.path.join(data_dir, 'advset_{}_at_fast.pt'.format(args.classifier_name))))
-    advset_clean = TensorDataset(torch.load(os.path.join(data_dir, 'advset_{}_clean.pt'.format(args.classifier_name))))
+    advset_clean = torch.load(os.path.join(data_dir, 'advset_{}_clean.pt'.format(args.classifier_name)))
 
     clean_loader = DataLoader(dataset=clean_test_data, batch_size=args.n_batch_test, shuffle=False)
     advset_loader = DataLoader(dataset=advset_clean, batch_size=args.n_batch_test, shuffle=False)
@@ -96,4 +96,6 @@ def run(args: DictConfig) -> None:
     torch.save(results_dict, 'adv_eval_width_results.pt')
 
 
+if __name__ == '__main__':
+    run()
 
