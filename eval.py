@@ -48,7 +48,7 @@ def eval_risk_bias_variance(classifier_list, dataloader, args):
         variance_meter.update(mean_variance.mean().item(), x.size(0))
         bias_meter.update(mean_bias.mean().item(), x.size(0))
         acc_meter.update(sum(acc_list)/len(acc_list), x.size(0))
-    return risk_meter.avg, bias_meter.avg, variance_meter.avg, acc_meter
+    return risk_meter.avg, bias_meter.avg, variance_meter.avg, acc_meter.avg
 
 
 @hydra.main(config_path='configs/eval_at_width_config.yaml')
@@ -76,8 +76,8 @@ def run(args: DictConfig) -> None:
             classifier.load_state_dict(torch.load(checkpoint))
             classifier_list.append(classifier)
 
-        results_dict['clean_on_clean'] = eval_risk_bias_variance(classifier_list, clean_loader, args)
-        results_dict['clean_on_adv'] = eval_risk_bias_variance(classifier_list, advset_loader, args)
+        results_dict['clean_on_clean_w{}'.format(width)] = eval_risk_bias_variance(classifier_list, clean_loader, args)
+        results_dict['clean_on_adv_w{}'.format(width)] = eval_risk_bias_variance(classifier_list, advset_loader, args)
 
         del classifier_list
 
@@ -90,8 +90,8 @@ def run(args: DictConfig) -> None:
             classifier.load_state_dict(torch.load(checkpoint))
             classifier_list.append(classifier)
 
-        results_dict['adv_on_clean'] = eval_risk_bias_variance(classifier_list, clean_loader, args)
-        results_dict['adv_on_adv'] = eval_risk_bias_variance(classifier_list, advset_loader, args)
+        results_dict['adv_on_clean_w{}'.format(width)] = eval_risk_bias_variance(classifier_list, clean_loader, args)
+        results_dict['adv_on_adv_w{}'.format(width)] = eval_risk_bias_variance(classifier_list, advset_loader, args)
 
     torch.save(results_dict, 'adv_eval_width_results.pt')
 
